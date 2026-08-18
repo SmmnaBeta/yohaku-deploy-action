@@ -124,19 +124,15 @@ jobs:
           cd "$GITHUB_WORKSPACE"
           mkdir -p assets
           rm -f assets/release.zip
-          (cd apps/web/.next && zip --symlinks -r "$GITHUB_WORKSPACE/assets/release.zip" ./* -x "dev/*" -x "cache/*")
+          (cd apps/web/.next && zip --symlinks -r "$GITHUB_WORKSPACE/assets/release.zip" standalone)
 
-      # - uses: actions/upload-artifact@v4
-      #   with:
-      #     name: dist
-      #     path: assets/release.zip
-      #     retention-days: 7
-      - name: Cache Build Artifacts
-        id: cache-primes
-        uses: actions/cache/save@v4
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
         with:
-          path: assets
-          key: ${{ github.run_number }}-release
+          name: dist
+          path: assets/release.zip
+          retention-days: 2
+          compression-level: 0
 
       - name: Store artifact commit version
         shell: bash
@@ -153,34 +149,9 @@ jobs:
     needs: build
     steps:
       - uses: actions/checkout@v4
-      # - name: Download artifact
-      #   uses: actions/download-artifact@v4
-      #   with:
-      #     name: dist
-
-      - name: Restore cached Build Artifacts
-        id: cache-primes-restore
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            assets
-          key: ${{ github.run_number }}-release
-      - name: Move assets to root
-        run: mv assets/release.zip release.zip
 
       - name: Prepare standalone PM2 config
         run: cp pm2/ecosystem.config.js ecosystem.config.js
-
-      - name: copy file via ssh password
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USER }}
-          password: ${{ secrets.PASSWORD }}
-          key: ${{ secrets.KEY }}
-          port: ${{ secrets.PORT }}
-          source: 'release.zip'
-          target: '/tmp/yohaku'
 
       - name: copy PM2 config via ssh password
         uses: appleboy/scp-action@v0.1.7
@@ -190,27 +161,36 @@ jobs:
           password: ${{ secrets.PASSWORD }}
           key: ${{ secrets.KEY }}
           port: ${{ secrets.PORT }}
+          timeout: 30s
+          command_timeout: 2m
           source: 'ecosystem.config.js'
           target: '/tmp/yohaku'
 
       - name: Exec deploy script with SSH
-        uses: appleboy/ssh-action@master
-
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_RUN_ID: ${{ github.run_id }}
         with:
-          command_timeout: 5m
+          command_timeout: 20m
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USER }}
           password: ${{ secrets.PASSWORD }}
           key: ${{ secrets.KEY }}
           port: ${{ secrets.PORT }}
+          envs: GH_TOKEN,GH_RUN_ID
           script: |
             set -e
             export NVM_DIR="$HOME/.nvm"
               [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+            pkill -u "$USER" -f 'scp -tr' || true
+            rm -f "$HOME"/*.tar.gz
             basedir=$HOME/yohaku
             workdir=$basedir/${{ github.run_number }}
             mkdir -p $workdir
             mkdir -p $basedir/.cache
+            mkdir -p /tmp/yohaku
+            gh run download "$GH_RUN_ID" -R ${{ github.repository }} -n dist -D /tmp/yohaku
             mv /tmp/yohaku/release.zip $workdir/release.zip
             install -m 644 /tmp/yohaku/ecosystem.config.js $basedir/ecosystem.config.js
             cd $workdir
