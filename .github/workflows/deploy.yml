@@ -102,6 +102,10 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
       - uses: jongwooo/next-cache@v1
+      # Next cannot resolve @yohaku/rich-content through the yohaku-oss
+      # double symlink. Docker already materializes these before pnpm install.
+      - name: Materialize OSS workspace packages
+        run: sh scripts/materialize-oss-workspace-packages.sh
       - name: Install dependencies
         run: pnpm install
       - name: Build project
