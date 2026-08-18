@@ -172,7 +172,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_RUN_ID: ${{ github.run_id }}
         with:
-          command_timeout: 20m
+          command_timeout: 45m
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USER }}
           password: ${{ secrets.PASSWORD }}
@@ -191,7 +191,9 @@ jobs:
             mkdir -p $workdir
             mkdir -p $basedir/.cache
             mkdir -p /tmp/yohaku
+            echo "Downloading artifact $GH_RUN_ID ..."
             gh run download "$GH_RUN_ID" -R ${{ github.repository }} -n dist -D /tmp/yohaku
+            echo "Download done, unzipping..."
             mv /tmp/yohaku/release.zip $workdir/release.zip
             install -m 644 /tmp/yohaku/ecosystem.config.js $basedir/ecosystem.config.js
             cd $workdir
