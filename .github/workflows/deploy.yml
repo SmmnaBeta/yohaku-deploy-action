@@ -183,7 +183,8 @@ jobs:
             set -e
             export NVM_DIR="$HOME/.nvm"
               [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-            pkill -u "$USER" -f 'scp -tr' || true
+            # Kill leftover scp binaries only; do not pkill -f (it matches this script).
+            ps -C scp -o pid= | xargs -r kill || true
             rm -f "$HOME"/*.tar.gz
             basedir=$HOME/yohaku
             workdir=$basedir/${{ github.run_number }}
