@@ -233,6 +233,13 @@ jobs:
             fi
             rm $workdir/release.zip
             pm2 save
+            # Drop previous GitHub run_number dirs after the new process is live.
+            for d in "$basedir"/[0-9]*; do
+              [ -d "$d" ] || continue
+              [ "$d" = "$workdir" ] && continue
+              echo "Removing old release $d"
+              rm -rf "$d"
+            done
             echo "Deployed successfully"
 
       - name: After deploy script
