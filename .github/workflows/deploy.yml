@@ -150,6 +150,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Download release artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+
       - name: Prepare standalone PM2 config
         run: cp pm2/ecosystem.config.js ecosystem.config.js
 
@@ -165,12 +170,23 @@ jobs:
           command_timeout: 2m
           source: 'ecosystem.config.js'
           target: '/tmp/yohaku'
+          rm: true
+
+      - name: copy release artifact via ssh
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          password: ${{ secrets.PASSWORD }}
+          key: ${{ secrets.KEY }}
+          port: ${{ secrets.PORT }}
+          timeout: 30s
+          command_timeout: 30m
+          source: 'release.zip'
+          target: '/tmp/yohaku'
 
       - name: Exec deploy script with SSH
         uses: appleboy/ssh-action@v1.2.0
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_RUN_ID: ${{ github.run_id }}
         with:
           command_timeout: 45m
           host: ${{ secrets.HOST }}
@@ -178,7 +194,6 @@ jobs:
           password: ${{ secrets.PASSWORD }}
           key: ${{ secrets.KEY }}
           port: ${{ secrets.PORT }}
-          envs: GH_TOKEN,GH_RUN_ID
           script: |
             set -e
             export NVM_DIR="$HOME/.nvm"
@@ -190,10 +205,7 @@ jobs:
             workdir=$basedir/${{ github.run_number }}
             mkdir -p $workdir
             mkdir -p $basedir/.cache
-            mkdir -p /tmp/yohaku
-            echo "Downloading artifact $GH_RUN_ID ..."
-            gh run download "$GH_RUN_ID" -R ${{ github.repository }} -n dist -D /tmp/yohaku
-            echo "Download done, unzipping..."
+            echo "Unzipping release..."
             mv /tmp/yohaku/release.zip $workdir/release.zip
             install -m 644 /tmp/yohaku/ecosystem.config.js $basedir/ecosystem.config.js
             cd $workdir
