@@ -106,8 +106,17 @@ jobs:
       # double symlink. Docker already materializes these before pnpm install.
       - name: Materialize OSS workspace packages
         run: sh scripts/materialize-oss-workspace-packages.sh
+      # Upstream `pnpm-workspace.yaml` lists `yohaku-oss/apps/mobile` and
+      # `yohaku-oss/packages/*` explicitly (pnpm 12 workspace compat, see
+      # innei-dev/Yohaku commit 3b5e61ee). The materialize step above
+      # dereferences `apps/mobile` from a symlink into a real directory, which
+      # then matches the `apps/*` workspace glob and makes pnpm expect an
+      # `importers["apps/mobile"]` entry that the upstream lockfile never had.
+      # Use --no-frozen-lockfile so pnpm re-derives the importer list on the
+      # runner without persisting any lockfile change (no commit/push happens
+      # here — this is the deploy-action repo, lockfile lives upstream).
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --no-frozen-lockfile
       - name: Build project
         env:
           BASE_URL: ${{ secrets.BASE_URL }}
